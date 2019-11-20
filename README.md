@@ -1,5 +1,10 @@
 # Spatial Transformer Networks
 
+### Results
+Initial cluttered minst image           |  After 300 epochs
+:-------------------------:|:-------------------------:
+![](https://github.com/minoring/spatial-transformer-net/blob/master/samples/epoch0.jpg)  |  ![](https://github.com/minoring/spatial-transformer-net/blob/master/samples/epoch290.jpg)
+
 ### References
 Paper
 
