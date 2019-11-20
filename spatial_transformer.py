@@ -1,4 +1,3 @@
-# import tensorflow.compat.v1 as tf
 import tensorflow as tf
 
 
@@ -10,8 +9,8 @@ def transformer(input_dim, theta, out_size, name='SpatialTransformer',
 
   Args:
     input_dim:
-      Input dimensions of CNN should have.
-      The output of the layer preceding the localization network. 
+      The input of the layer preceding the localization network. 
+      Also, Input dimensions of CNN should have.
       If the STN layer is the first layer of the network, 
       then this corresponds to the input images. Shape should be (B, H, W, C).
     theta: 
@@ -32,21 +31,24 @@ def transformer(input_dim, theta, out_size, name='SpatialTransformer',
     identity = identity.flatten()
     theta = tf.Variable(initial_value=identity)
   """
-  def _repeat(x, n_repeats):
-      with tf.compat.v1.variable_scope('_repeat'):
-          rep = tf.transpose(
-              tf.expand_dims(tf.ones(shape=tf.stack([n_repeats, ])), 1), [1, 0])
-          rep = tf.cast(rep, 'int32')
-          x = tf.matmul(tf.reshape(x, (-1, 1)), rep)
-          return tf.reshape(x, [-1])
 
-  def _interpolate(input_dim, x, y, out_size):
+  def _repeat(x, n_repeats):
+    with tf.compat.v1.variable_scope('_repeat'):
+      rep = tf.transpose(
+          tf.expand_dims(tf.ones(shape=tf.stack([
+              n_repeats,
+          ])), 1), [1, 0])
+      rep = tf.cast(rep, 'int32')
+      x = tf.matmul(tf.reshape(x, (-1, 1)), rep)
+      return tf.reshape(x, [-1])
+
+  def _interpolate(img, x, y, out_size):
     with tf.compat.v1.variable_scope('_interpolate'):
       # Constants
-      num_batch = tf.shape(input_dim)[0]
-      height = tf.shape(input_dim)[1]
-      width = tf.shape(input_dim)[2]
-      channels = tf.shape(input_dim)[3]
+      num_batch = tf.shape(img)[0]
+      height = tf.shape(img)[1]
+      width = tf.shape(img)[2]
+      channels = tf.shape(img)[3]
 
       x = tf.cast(x, tf.float32)
       y = tf.cast(y, tf.float32)
@@ -80,8 +82,35 @@ def transformer(input_dim, theta, out_size, name='SpatialTransformer',
       base = _repeat(tf.range(num_batch) * dim1, out_height * out_width)
       base_y0 = base + y0 * dim2
       base_y1 = base + y1 * dim2
-      print(base_y1)
+      idx_a = base_y0 + x0
+      idx_b = base_y1 + x0
+      idx_c = base_y0 + x1
+      idx_d = base_y1 + x1
 
+      # Use indices to lookup pixels in the flat image and restore
+      # channels dim
+      img_flat = tf.reshape(img, tf.stack([-1, channels]))
+      # Same as (-1, channels)
+      img_flat = tf.cast(img_flat, tf.float32)
+      Ia = tf.gather(img_flat, idx_a)
+      Ib = tf.gather(img_flat, idx_b)
+      Ic = tf.gather(img_flat, idx_c)
+      Id = tf.gather(img_flat, idx_d)
+
+      # Calculate interpolated values
+      x0_f = tf.cast(x0, tf.float32)
+      x1_f = tf.cast(x1, tf.float32)
+      y0_f = tf.cast(y0, tf.float32)
+      y1_f = tf.cast(y1, tf.float32)
+
+      wa = tf.expand_dims(((x1_f - x) * (y1_f - y)), 1)
+      wb = tf.expand_dims(((x1_f - x) * (y - y0_f)), 1)
+      wc = tf.expand_dims(((x - x0_f) * (y1_f - y)), 1)
+      wd = tf.expand_dims(((x - x0_f) * (y - y0_f)), 1)
+
+      # Adds all input tensors element-wise.
+      output = tf.add_n([wa * Ia, wb * Ib, wc * Ic, wd * Id])
+      return output
 
   def _meshgrid(height, width):
     with tf.compat.v1.variable_scope('_meshgrid'):
@@ -120,6 +149,7 @@ def transformer(input_dim, theta, out_size, name='SpatialTransformer',
       width_f = tf.cast(width, 'float32')
       out_height = out_size[0]
       out_width = out_size[1]
+
       _meshgrid(out_height, out_width)
       grid = _meshgrid(out_height, out_width)
       grid = tf.expand_dims(grid, 0)
@@ -139,14 +169,12 @@ def transformer(input_dim, theta, out_size, name='SpatialTransformer',
       x_s_flat = tf.reshape(x_s, [-1])  # Shape of [-1] flattens into 1-D
       y_s_flat = tf.reshape(y_s, [-1])
 
-      # input_transformed = _interpolate(input_dim, x_s_flat, y_s_flat, out_size)
-      _interpolate(input_dim, x_s_flat, y_s_flat, out_size)
+      input_transformed = _interpolate(input_dim, x_s_flat, y_s_flat, out_size)
 
-      # output = tf.reshape(
-      #     input_transformed,
-      #     tf.stack([num_batch, out_height, out_width, num_channels]))
+      output = tf.reshape(input_transformed,
+                          (num_batch, out_height, out_width, num_channels))
 
-      # return output
+      return output
 
   with tf.compat.v1.variable_scope(name):
     output = _transform(theta, input_dim, out_size)

@@ -1,13 +1,21 @@
-"""Implement STN in TF
+"""Implement STN in TF 2.0
 
 Reference:
   https://github.com/daviddao/spatial-transformer-tensorflow/blob/master/cluttered_mnist.py
 """
+# import tensorflow as tf
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
-from spatial_transformer import transformer
 import numpy as np
-from tf_utils import weight_variable, bias_variable, dense_to_one_hot
+
+from spatial_transformer import transformer
+from tf_utils import weight_variable
+from tf_utils import bias_variable
+from tf_utils import dense_to_one_hot
+from utils import imshow
+from utils import save_example_imgs
+from utils import create_gif 
+
 
 # Load data
 mnist_cluttered = np.load('./data/mnist_sequence1_sample_5distortions5x5.npz')
@@ -60,3 +68,105 @@ h_fc_loc2 = tf.nn.tanh(tf.matmul(h_fc_loc1_drop, W_fc_loc2) + b_fc_loc2)
 # patches
 out_size = (40, 40)
 h_trans = transformer(x_tensor, h_fc_loc2, out_size)
+
+# Weight matrix shape (filter_height, filter_width, input_channels, output_channels)
+filter_size = 3
+n_filters_1 = 16
+W_conv1 = weight_variable([filter_size, filter_size, 1, n_filters_1])
+
+# Bias is (output_channels)
+b_conv1 = bias_variable([n_filters_1])
+
+# Build a graph which does the first layer of convolution:
+# We define our stride as batch x height x width x channels
+# instead of pooling, we use strides of 2 and more layers
+# with smaller filters.
+
+h_conv1 = tf.nn.relu(
+    tf.nn.conv2d(
+        input=h_trans, filter=W_conv1, strides=[1, 2, 2, 1], padding='SAME') +
+    b_conv1)
+
+n_filters_2 = 16
+W_conv2 = weight_variable([filter_size, filter_size, n_filters_1, n_filters_2])
+b_conv2 = bias_variable([n_filters_2])
+h_conv2 = tf.nn.relu(
+    tf.nn.conv2d(
+        input=h_conv1, filters=W_conv2, strides=[1, 2, 2, 1], padding='SAME') +
+    b_conv2)
+
+# Reshape so we can connect to a fully-connected layer:
+h_conv2_flat = tf.reshape(h_conv2, [-1, 10 * 10 * n_filters_2])
+
+# Create a fully-connected layer
+n_fc = 1024
+W_fc1 = weight_variable([10 * 10 * n_filters_2, n_fc])
+b_fc1 = bias_variable([n_fc])
+h_fc1 = tf.nn.relu(tf.matmul(h_conv2_flat, W_fc1) + b_fc1)
+
+h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
+
+# Finally, softmax layer
+W_fc2 = weight_variable([n_fc, 10])
+b_fc2 = bias_variable([10])
+y_logits = tf.matmul(h_fc1_drop, W_fc2) + b_fc2
+
+# Define loss/eval/training functions
+cross_entropy = tf.reduce_mean(
+    tf.nn.softmax_cross_entropy_with_logits(logits=y_logits, labels=y))
+
+opt = tf.train.AdamOptimizer()
+optimizer = opt.minimize(cross_entropy)
+# Why localisation layer?
+grads = opt.compute_gradients(cross_entropy, [b_fc_loc2])
+
+# Monitor accuracy
+correct_prediction = tf.math.equal(tf.math.argmax(y_logits, axis=1),
+                                   tf.math.argmax(y, axis=1))
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+# Initialization the variables
+sess = tf.Session()
+sess.run(tf.global_variables_initializer())
+
+# Train in minibatches and report accuracy, loss
+iter_per_epoch = 100
+n_epochs = 300
+target_size = 10000
+
+indices = np.linspace(0, 10000 - 1, iter_per_epoch)
+indices = indices.astype('int')
+
+for epoch_i in range(n_epochs):
+  for iter_i in range(iter_per_epoch - 1):
+    batch_xs = X_train[indices[iter_i]:indices[iter_i + 1]]
+    batch_ys = Y_train[indices[iter_i]:indices[iter_i + 1]]
+
+    # if iter_i % 20 == 0:
+    #   loss = sess.run(cross_entropy,
+    #                   feed_dict={
+    #                       x: batch_xs,
+    #                       y: batch_ys,
+    #                       keep_prob: 1.0
+    #                   })
+    #   print('Epoch: {}, Iteration: {}, Loss: {}'.format(epoch_i, iter_i, loss))
+
+    sess.run(optimizer, feed_dict={x: batch_xs, y: batch_ys, keep_prob: 0.8})
+
+  print(
+      'Accuracy epoch %d: ' % epoch_i +
+      str(sess.run(accuracy, feed_dict={
+          x: X_valid,
+          y: Y_valid,
+          keep_prob: 1.0
+      })))
+
+  if epoch_i % 10 == 0:
+    example_img_transformed = sess.run(h_trans, feed_dict={
+        x: X_train[0:16],
+        y: Y_train[0:16],
+        keep_prob: 1.0
+    })
+    save_example_imgs(example_img_transformed, epoch_i)
+
+create_gif()
