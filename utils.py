@@ -35,6 +35,8 @@ def save_example_imgs(img, epoch):
     os.mkdir('samples')
   plt.savefig('samples/epoch{}.jpg'.format(epoch))
 
+  fig.clf()
+
 
 def create_gif():
   """Create gif using saved images"""
