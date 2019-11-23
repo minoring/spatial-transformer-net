@@ -4,13 +4,27 @@ import imageio
 import glob
 import os
 
+import tensorflow as tf
+
+
+class ImageCallback(tf.keras.callbacks.Callback):
+
+  def __init__(self, example_imgs):
+    # super(ImageCallback, self).__init__()
+    self.example_imgs = example_imgs
+
+  def on_epoch_end(self, epoch, logs=None):
+    if epoch % 10 == 0:
+      save_example_imgs(self.example_imgs, epoch)
+
 
 def imshow(img):
   """Show Numpy array image ranged (-1, 1)"""
   out = img.copy()
   out = (out + 1.0) / 2.0
-  plt.imshow(out[0, :, :, 0]) # Remove batch, color dimension
+  plt.imshow(out[0, :, :, 0])  # Remove batch, color dimension
   plt.show()
+
 
 def save_example_imgs(img, epoch):
   out = img.copy()
@@ -30,7 +44,7 @@ def save_example_imgs(img, epoch):
       axarr[i, j].set_xticklabels([])
       # plt.subplot(num_row, num_col, i * num_col + j + 1)
       # plt.imshow(img[i * num_row + j, :, :, 0], cmap='binary')
-  
+
   if not os.path.isdir('samples'):
     os.mkdir('samples')
   plt.savefig('samples/epoch{}.jpg'.format(epoch))

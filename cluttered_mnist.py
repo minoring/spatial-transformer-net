@@ -11,10 +11,8 @@ from absl import flags
 
 from spatial_transformer import transformer
 from transformer import Transformer
-from tf_utils import dense_to_one_hot
-from utils import imshow
-from utils import save_example_imgs
 from utils import create_gif
+from utils import ImageCallback
 from flags import define_flags
 
 
@@ -30,6 +28,8 @@ def run(flags_obj):
   y_test = mnist_cluttered['y_test']
 
   X_train = np.reshape(X_train, (-1, 40, 40, 1))
+  X_valid = np.reshape(X_valid, (-1, 40, 40, 1))
+
   BUFFER_SIZE = 10000
   BATCH_SIZE = 256
   train_ds = tf.data.Dataset.from_tensor_slices(
@@ -80,10 +80,9 @@ def run(flags_obj):
       train_ds,
       epochs=EPOCHS,
       steps_per_epoch=STEPS_PER_EPOCH,
-  )
-
-  # save_example_imgs(example_img_transformed, epoch_i)
-  # create_gif()
+      callbacks=[ImageCallback(X_train[:16])])
+  
+  create_gif()
 
 
 def main(_):
