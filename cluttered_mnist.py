@@ -30,9 +30,10 @@ def run(flags_obj):
   y_test = mnist_cluttered['y_test']
 
   X_train = np.reshape(X_train, (-1, 40, 40, 1))
-  print(X_train.shape)
-
+  BUFFER_SIZE = 10000
   BATCH_SIZE = 256
+  train_ds = tf.data.Dataset.from_tensor_slices(
+      (X_train, y_train)).shuffle(BUFFER_SIZE).repeat().batch(BATCH_SIZE)
 
   inputs = tf.keras.Input(shape=(
       40,
@@ -67,11 +68,19 @@ def run(flags_obj):
   # tf.keras.utils.plot_model(spatial_transformer_nets)
 
   # # Train in minibatches and report accuracy, loss
-  # n_epochs = 300
-  # steps_per_epoch = 10000 // BATCH_SIZE
-  # spatial_transformer_nets.fit(train_ds,
-  #                              steps_per_epoch=steps_per_epoch,
-  #                              epochs=n_epochs)
+  EPOCHS = 300
+  STEPS_PER_EPOCH = X_train.shape[0] // BATCH_SIZE
+
+  spatial_transformer_nets.compile(
+      optimizer='adam',
+      loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+      metrics=['accuracy'])
+
+  spatial_transformer_nets.fit(
+      train_ds,
+      epochs=EPOCHS,
+      steps_per_epoch=STEPS_PER_EPOCH,
+  )
 
   # save_example_imgs(example_img_transformed, epoch_i)
   # create_gif()
