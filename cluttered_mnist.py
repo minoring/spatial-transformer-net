@@ -31,7 +31,7 @@ def run(flags_obj):
   X_valid = np.reshape(X_valid, (-1, 40, 40, 1))
 
   BUFFER_SIZE = 10000
-  BATCH_SIZE = 256
+  BATCH_SIZE = flags_obj.batch_size 
   train_ds = tf.data.Dataset.from_tensor_slices(
       (X_train, y_train)).shuffle(BUFFER_SIZE).repeat().batch(BATCH_SIZE)
 
@@ -46,7 +46,8 @@ def run(flags_obj):
   locnet = tf.keras.layers.Dropout(rate=0.2)(locnet)
   locnet = tf.keras.layers.Dense(6, activation='tanh')(locnet)
 
-  h_transformed = Transformer((40, 40))([inputs, locnet])
+  out_size = (flags_obj.locnet_height, flags_obj.locnet_width)
+  h_transformed = Transformer(out_size)([inputs, locnet])
 
   h_transformed = tf.reshape(h_transformed, (-1, 40, 40, 1))
   conv_net = tf.keras.layers.Conv2D(16,
@@ -68,7 +69,7 @@ def run(flags_obj):
   # tf.keras.utils.plot_model(spatial_transformer_nets)
 
   # # Train in minibatches and report accuracy, loss
-  EPOCHS = 300
+  EPOCHS = flags_obj.epoch
   STEPS_PER_EPOCH = X_train.shape[0] // BATCH_SIZE
 
   spatial_transformer_nets.compile(
@@ -86,7 +87,7 @@ def run(flags_obj):
 
 
 def main(_):
-  run(flags.Flag)
+  run(flags.FLAGS)
 
 
 if __name__ == '__main__':

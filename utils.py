@@ -10,7 +10,7 @@ import tensorflow as tf
 class ImageCallback(tf.keras.callbacks.Callback):
 
   def __init__(self, example_imgs):
-    # super(ImageCallback, self).__init__()
+    super(ImageCallback, self).__init__()
     self.example_imgs = example_imgs
 
   def on_epoch_end(self, epoch, logs=None):
