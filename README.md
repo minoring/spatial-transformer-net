@@ -5,6 +5,9 @@ Initial cluttered minst image           |  After 300 epochs
 :-------------------------:|:-------------------------:
 ![](https://github.com/minoring/spatial-transformer-net/blob/master/samples/epoch0.jpg)  |  ![](https://github.com/minoring/spatial-transformer-net/blob/master/samples/epoch290.jpg)
 
+### Usage
+```python cluttered_mnist.py --epoch=($epoch) --batch_size=($batch_size)```
+
 ### References
 Paper
 
